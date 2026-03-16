@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NetWatch — Network Monitor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #080c10;
+      --bg2: #0d1117;
+      --bg3: #111820;
+      --border: #1e3a4a;
+      --accent: #00e5ff;
+      --accent2: #00ff9d;
+      --accent3: #ff6b35;
+      --danger: #ff3b5c;
+      --text: #c8d8e8;
+      --text-dim: #4a6a7a;
+      --glow: 0 0 20px rgba(0,229,255,0.15);
+      --glow-strong: 0 0 30px rgba(0,229,255,0.3);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── GRID BG ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,12,16,0.95);
+      backdrop-filter: blur(10px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: var(--glow);
+    }
+
+    .logo-text {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 22px;
+      color: var(--accent);
+      letter-spacing: 3px;
+      text-shadow: 0 0 20px rgba(0,229,255,0.5);
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+    .dot.green { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); animation: pulse 2s infinite; }
+    .dot.red { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+    .dot.yellow { background: #ffd700; box-shadow: 0 0 8px #ffd700; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── TABS ── */
+    .tabs {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      padding: 0 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    .tab {
+      padding: 14px 24px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      text-shadow: 0 0 10px rgba(0,229,255,0.4);
+    }
+
+    /* ── MAIN ── */
+    main {
+      position: relative;
+      z-index: 1;
+      padding: 28px 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      display: none;
+    }
+    .panel.active { display: block; }
+
+    /* ── STAT CARDS ── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+      border-color: var(--accent);
+      box-shadow: var(--glow);
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 28px;
+      color: var(--accent);
+      text-shadow: 0 0 15px rgba(0,229,255,0.4);
+    }
+
+    .stat-value.green { color: var(--accent2); text-shadow: 0 0 15px rgba(0,255,157,0.4); }
+    .stat-value.red { color: var(--danger); text-shadow: 0 0 15px rgba(255,59,92,0.4); }
+    .stat-value.orange { color: var(--accent3); text-shadow: 0 0 15px rgba(255,107,53,0.4); }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title::before {
+      content: '';
+      width: 3px; height: 14px;
+      background: var(--accent);
+      border-radius: 2px;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      padding: 9px 20px;
+      border-radius: 6px;
+      border: 1px solid;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: rgba(0,229,255,0.1);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-primary:hover {
+      background: rgba(0,229,255,0.2);
+      box-shadow: var(--glow);
+    }
+
+    .btn-success {
+      background: rgba(0,255,157,0.1);
+      border-color: var(--accent2);
+      color: var(--accent2);
+    }
+    .btn-success:hover { background: rgba(0,255,157,0.2); }
+
+    .btn-danger {
+      background: rgba(255,59,92,0.1);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+    .btn-danger:hover { background: rgba(255,59,92,0.2); }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-group { display: flex; gap: 10px; }
+
+    /* ── TABLE ── */
+    .table-wrap {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead tr {
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(30,58,74,0.5);
+      transition: background 0.15s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(0,229,255,0.04); }
+
+    td {
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .mono { font-family: 'Share Tech Mono', monospace; font-size: 13px; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .badge-green { background: rgba(0,255,157,0.12); color: var(--accent2); border: 1px solid rgba(0,255,157,0.3); }
+    .badge-red { background: rgba(255,59,92,0.12); color: var(--danger); border: 1px solid rgba(255,59,92,0.3); }
+    .badge-blue { background: rgba(0,229,255,0.12); color: var(--accent); border: 1px solid rgba(0,229,255,0.3); }
+    .badge-orange { background: rgba(255,107,53,0.12); color: var(--accent3); border: 1px solid rgba(255,107,53,0.3); }
+
+    /* ── LOADING ── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 40px;
+      color: var(--text-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+    }
+
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── EMPTY STATE ── */
+    .empty {
+      text-align: center;
+      padding: 50px;
+      color: var(--text-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+    }
+
+    /* ── CHARTS ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .chart-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .chart-title {
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chart-canvas { width: 100% !important; height: 120px !important; }
+
+    /* ── QoS TARGET CARDS ── */
+    .qos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .qos-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .qos-card.online { border-color: rgba(0,255,157,0.3); }
+    .qos-card.offline { border-color: rgba(255,59,92,0.3); }
+
+    .qos-host {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .qos-name {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .qos-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .qos-metric-label {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .qos-metric-value {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 18px;
+      color: var(--accent);
+    }
+
+    .qos-score-ring {
+      position: absolute;
+      top: 16px; right: 16px;
+      width: 50px; height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    .qos-score-num {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      color: var(--accent2);
+      line-height: 1;
+    }
+
+    .qos-score-label {
+      font-size: 9px;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    /* ── ALERTS ── */
+    .alert-banner {
+      background: rgba(255,59,92,0.08);
+      border: 1px solid rgba(255,59,92,0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .alert-banner-text {
+      color: var(--danger);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    /* ── ADD TARGET FORM ── */
+    .add-target-form {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .form-label {
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    input[type="text"] {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 14px;
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 160px;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0,229,255,0.1);
+    }
+
+    /* ── SCAN ANIMATION ── */
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(2000%); }
+    }
+
+    .scan-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(8,12,16,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .scan-text {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      color: var(--accent);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: 0 0 20px var(--accent);
+    }
+
+    .scan-bar {
+      width: 300px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .scan-progress {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      animation: progress 3s ease-in-out forwards;
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    @keyframes progress {
+      0% { width: 0%; }
+      100% { width: 100%; }
+    }
+
+    .hidden { display: none !important; }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- SCAN OVERLAY -->
+<div class="scan-overlay hidden" id="scanOverlay">
+  <div class="scan-text" id="scanMsg">Scanning Network...</div>
+  <div class="scan-bar"><div class="scan-progress" id="scanProgress"></div></div>
+  <div style="font-size:12px; color:var(--text-dim); font-family:'Share Tech Mono',monospace; letter-spacing:2px;">
+    Sending ARP Requests · Resolving Hostnames
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    <div>
+      <div class="logo-text">NETWATCH</div>
+      <div class="logo-sub">Network Monitor & QoS Analyser</div>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="status-pill">
+      <div class="dot green" id="connDot"></div>
+      <span id="localIp">Detecting...</span>
+    </div>
+    <div class="status-pill" id="alertPill" style="display:none; border-color: rgba(255,59,92,0.5); color:var(--danger)">
+      <div class="dot red"></div>
+      <span id="alertCount">0 Alerts</span>
+    </div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('scanner')">Device Scanner</div>
+  <div class="tab" onclick="switchTab('qos')">QoS Monitor</div>
+  <div class="tab" onclick="switchTab('alerts')">Security Alerts</div>
+</div>
+
+<!-- MAIN -->
+<main>
+
+  <!-- ═══ SCANNER PANEL ═══ -->
+  <div class="panel active" id="panel-scanner">
+
+    <div class="stat-row" id="scanStats">
+      <div class="stat-card">
+        <div class="stat-label">Total Devices</div>
+        <div class="stat-value" id="totalDevices">—</div>
+        <div class="stat-sub">Connected to network</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Online</div>
+        <div class="stat-value green" id="onlineCount">—</div>
+        <div class="stat-sub">Active devices</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Unknown Devices</div>
+        <div class="stat-value orange" id="unknownCount">—</div>
+        <div class="stat-sub">Not whitelisted</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Last Scan</div>
+        <div class="stat-value" id="lastScan" style="font-size:18px;">—</div>
+        <div class="stat-sub">Timestamp</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">Connected Devices</div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="startScan()">⬡ Scan Network</button>
+        <button class="btn btn-success" onclick="whitelistAll()">✓ Whitelist All</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="loading hidden" id="scanLoading">
+        <div class="spinner"></div>
+        Scanning network — this may take a few seconds...
+      </div>
+      <div class="empty" id="scanEmpty">
+        Click <strong>Scan Network</strong> to discover devices
+      </div>
+      <table id="deviceTable" class="hidden">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>IP Address</th>
+            <th>MAC Address</th>
+            <th>Hostname</th>
+            <th>Device Type</th>
+            <th>Status</th>
+            <th>Last Seen</th>
+          </tr>
+        </thead>
+        <tbody id="deviceTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ QoS PANEL ═══ -->
+  <div class="panel" id="panel-qos">
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-label">Monitoring</div>
+        <div class="stat-value green" id="qosStatus">Idle</div>
+        <div class="stat-sub">QoS monitor state</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Latency</div>
+        <div class="stat-value" id="avgLatency">—</div>
+        <div class="stat-sub">ms across all targets</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Packet Loss</div>
+        <div class="stat-value orange" id="avgLoss">—</div>
+        <div class="stat-sub">average %</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">QoS Score</div>
+        <div class="stat-value green" id="overallQos">—</div>
+        <div class="stat-sub">out of 100</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">Live Monitoring</div>
+      <div class="btn-group">
+        <button class="btn btn-success" id="startBtn" onclick="startQoS()">▶ Start Monitor</button>
+        <button class="btn btn-danger" id="stopBtn" onclick="stopQoS()" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <div class="qos-grid" id="qosGrid">
+      <div class="empty" style="grid-column: 1/-1">Click <strong>Start Monitor</strong> to begin tracking</div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">Add Custom Target</div>
+    </div>
+
+    <div class="add-target-form">
+      <span class="form-label">Name:</span>
+      <input type="text" id="targetName" placeholder="e.g. My Router" />
+      <span class="form-label">Host / IP:</span>
+      <input type="text" id="targetHost" placeholder="e.g. 192.168.1.1" />
+      <button class="btn btn-primary" onclick="addTarget()">+ Add Target</button>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">Latency History</div>
+    </div>
+
+    <div class="charts-grid" id="chartsGrid"></div>
+
+  </div>
+
+  <!-- ═══ ALERTS PANEL ═══ -->
+  <div class="panel" id="panel-alerts">
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Alerts</div>
+        <div class="stat-value red" id="totalAlerts">0</div>
+        <div class="stat-sub">Rogue devices detected</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Whitelisted</div>
+        <div class="stat-value green" id="whitelistedCount">0</div>
+        <div class="stat-sub">Trusted devices</div>
+      </div>
+      <div class="stat-card" style="grid-column: span 2;">
+        <div class="stat-label">Protection Status</div>
+        <div class="stat-value" id="protStatus" style="font-size:16px; margin-top:4px;">Whitelist devices to enable rogue detection</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">Security Alerts</div>
+      <div class="btn-group">
+        <button class="btn btn-danger" onclick="clearAlerts()">✕ Clear All Alerts</button>
+        <button class="btn btn-primary" onclick="loadAlerts()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="empty" id="alertsEmpty">No alerts — network is secure</div>
+      <table id="alertTable" class="hidden">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>IP Address</th>
+            <th>MAC Address</th>
+            <th>Message</th>
+            <th>Severity</th>
+          </tr>
+        </thead>
+        <tbody id="alertTableBody"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+  // ─── STATE ───────────────────────────────────────────────
+  let qosRunning = false;
+  let qosInterval = null;
+  let charts = {};
+  let whitelistedCount = 0;
+
+  // ─── TAB SWITCH ──────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      const names = ['scanner', 'qos', 'alerts'];
+      t.classList.toggle('active', names[i] === name);
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    if (name === 'alerts') loadAlerts();
+  }
+
+  // ─── GET LOCAL IP ─────────────────────────────────────────
+  async function getLocalIp() {
+    // Shown via scan result
+    document.getElementById('localIp').textContent = 'Connected';
+  }
+
+  getLocalIp();
+
+  // ─── SCANNER ─────────────────────────────────────────────
+  async function startScan() {
+    // Show overlay
+    const overlay = document.getElementById('scanOverlay');
+    overlay.classList.remove('hidden');
+
+    // Reset progress animation
+    const prog = document.getElementById('scanProgress');
+    prog.style.animation = 'none';
+    prog.offsetHeight;
+    prog.style.animation = 'progress 4s ease-in-out forwards';
+
+    document.getElementById('scanLoading').classList.remove('hidden');
+    document.getElementById('scanEmpty').classList.add('hidden');
+    document.getElementById('deviceTable').classList.add('hidden');
+
+    try {
+      const res = await fetch('/api/scan');
+      const data = await res.json();
+
+      overlay.classList.add('hidden');
+
+      if (data.success) {
+        renderDevices(data.devices);
+        updateScanStats(data.devices);
+        checkAlerts();
+      } else {
+        alert('Scan failed: ' + data.error);
+      }
+    } catch (e) {
+      overlay.classList.add('hidden');
+      alert('Error: ' + e.message);
+    }
+
+    document.getElementById('scanLoading').classList.add('hidden');
+  }
+
+  function renderDevices(devices) {
+    const tbody = document.getElementById('deviceTableBody');
+    tbody.innerHTML = '';
+
+    devices.forEach((d, i) => {
+      const tr = document.createElement('tr');
+      const typeBadge = d.type === 'This Device' ? 'badge-blue' : 'badge-green';
+
+      tr.innerHTML = `
+        <td class="mono" style="color:var(--text-dim)">${i + 1}</td>
+        <td class="mono" style="color:var(--accent)">${d.ip}</td>
+        <td class="mono">${d.mac}</td>
+        <td>${d.hostname}</td>
+        <td><span class="badge ${typeBadge}">${d.type}</span></td>
+        <td><span class="badge badge-green">${d.status}</span></td>
+        <td class="mono" style="color:var(--text-dim)">${d.last_seen}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('deviceTable').classList.remove('hidden');
+  }
+
+  function updateScanStats(devices) {
+    document.getElementById('totalDevices').textContent = devices.length;
+    document.getElementById('onlineCount').textContent = devices.filter(d => d.status === 'Online').length;
+    const unknown = devices.filter(d => d.mac !== 'self' && d.mac !== 'N/A').length;
+    document.getElementById('unknownCount').textContent = unknown;
+    document.getElementById('lastScan').textContent = new Date().toLocaleTimeString();
+  }
+
+  async function whitelistAll() {
+    const res = await fetch('/api/whitelist_all', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      whitelistedCount = data.whitelisted;
+      document.getElementById('whitelistedCount').textContent = whitelistedCount;
+      document.getElementById('protStatus').textContent = '✓ Rogue detection active — ' + whitelistedCount + ' trusted devices';
+      document.getElementById('protStatus').style.color = 'var(--accent2)';
+      alert('✓ ' + data.whitelisted + ' devices whitelisted. New devices will trigger alerts!');
+    }
+  }
+
+  // ─── QoS ─────────────────────────────────────────────────
+  async function startQoS() {
+    const res = await fetch('/api/qos/start', { method: 'POST' });
+    const data = await res.json();
+    qosRunning = true;
+    document.getElementById('qosStatus').textContent = 'Active';
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+
+    // Poll every 3 seconds
+    qosInterval = setInterval(refreshQoS, 3000);
+    setTimeout(refreshQoS, 500);
+  }
+
+  async function stopQoS() {
+    await fetch('/api/qos/stop', { method: 'POST' });
+    qosRunning = false;
+    clearInterval(qosInterval);
+    document.getElementById('qosStatus').textContent = 'Stopped';
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+  }
+
+  async function refreshQoS() {
+    const res = await fetch('/api/qos/stats');
+    const stats = await res.json();
+    renderQoSCards(stats);
+    renderCharts(stats);
+    updateQoSStats(stats);
+  }
+
+  function renderQoSCards(stats) {
+    const grid = document.getElementById('qosGrid');
+    grid.innerHTML = '';
+
+    for (const [name, s] of Object.entries(stats)) {
+      const isOnline = s.status === 'Online';
+      const card = document.createElement('div');
+      card.className = 'qos-card ' + (isOnline ? 'online' : 'offline');
+
+      card.innerHTML = `
+        <div class="qos-score-ring">
+          <div class="qos-score-num">${s.qos_score}</div>
+          <div class="qos-score-label">QoS</div>
+        </div>
+        <div class="qos-host">${s.host}</div>
+        <div class="qos-name">${name}</div>
+        <div style="margin-bottom:12px">
+          <span class="badge ${isOnline ? 'badge-green' : 'badge-red'}">${s.status}</span>
+        </div>
+        <div class="qos-metrics">
+          <div>
+            <div class="qos-metric-label">Avg Latency</div>
+            <div class="qos-metric-value">${s.avg_latency}<span style="font-size:11px;color:var(--text-dim)"> ms</span></div>
+          </div>
+          <div>
+            <div class="qos-metric-label">Jitter</div>
+            <div class="qos-metric-value">${s.jitter}<span style="font-size:11px;color:var(--text-dim)"> ms</span></div>
+          </div>
+          <div>
+            <div class="qos-metric-label">Packet Loss</div>
+            <div class="qos-metric-value" style="color:${s.packet_loss > 5 ? 'var(--danger)' : 'var(--accent2)'}">
+              ${s.packet_loss}<span style="font-size:11px"> %</span>
+            </div>
+          </div>
+          <div>
+            <div class="qos-metric-label">Min / Max</div>
+            <div class="qos-metric-value" style="font-size:13px">${s.min_latency} / ${s.max_latency}</div>
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+    }
+  }
+
+  function renderCharts(stats) {
+    const grid = document.getElementById('chartsGrid');
+
+    for (const [name, s] of Object.entries(stats)) {
+      if (!s.latency_history.length) continue;
+
+      const canvasId = 'chart-' + name.replace(/\s/g, '-');
+
+      if (!document.getElementById(canvasId)) {
+        const card = document.createElement('div');
+        card.className = 'chart-card';
+        card.innerHTML = `
+          <div class="chart-title">
+            <span>${name}</span>
+            <span class="mono" style="color:var(--accent)">${s.avg_latency}ms avg</span>
+          </div>
+          <canvas id="${canvasId}" class="chart-canvas"></canvas>
+        `;
+        grid.appendChild(card);
+
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        charts[name] = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: s.timestamps,
+            datasets: [{
+              data: s.latency_history,
+              borderColor: '#00e5ff',
+              backgroundColor: 'rgba(0,229,255,0.05)',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.4,
+              fill: true,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: false },
+              y: {
+                grid: { color: 'rgba(30,58,74,0.5)' },
+                ticks: { color: '#4a6a7a', font: { size: 10 }, maxTicksLimit: 4 },
+                beginAtZero: true,
+              }
+            }
+          }
+        });
+      } else {
+        // Update existing chart
+        const chart = charts[name];
+        chart.data.labels = s.timestamps;
+        chart.data.datasets[0].data = s.latency_history;
+        chart.update('none');
+
+        // Update title avg
+        const card = document.getElementById(canvasId).parentElement;
+        card.querySelector('.chart-title span:last-child').textContent = s.avg_latency + 'ms avg';
+      }
+    }
+  }
+
+  function updateQoSStats(stats) {
+    const all = Object.values(stats);
+    if (!all.length) return;
+
+    const latencies = all.map(s => s.avg_latency).filter(v => v > 0);
+    const losses = all.map(s => s.packet_loss);
+    const scores = all.map(s => s.qos_score).filter(v => v > 0);
+
+    if (latencies.length)
+      document.getElementById('avgLatency').textContent = Math.round(latencies.reduce((a, b) => a + b) / latencies.length) + ' ms';
+    document.getElementById('avgLoss').textContent = (losses.reduce((a, b) => a + b) / losses.length).toFixed(1) + '%';
+    if (scores.length)
+      document.getElementById('overallQos').textContent = Math.round(scores.reduce((a, b) => a + b) / scores.length);
+  }
+
+  async function addTarget() {
+    const name = document.getElementById('targetName').value.trim();
+    const host = document.getElementById('targetHost').value.trim();
+    if (!name || !host) return alert('Please enter both name and host');
+
+    const res = await fetch('/api/qos/add_target', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, host })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('targetName').value = '';
+      document.getElementById('targetHost').value = '';
+      alert('✓ Target added: ' + name);
+    }
+  }
+
+  // ─── ALERTS ──────────────────────────────────────────────
+  async function loadAlerts() {
+    const res = await fetch('/api/alerts');
+    const data = await res.json();
+
+    document.getElementById('totalAlerts').textContent = data.count;
+
+    // Update header pill
+    const pill = document.getElementById('alertPill');
+    const countEl = document.getElementById('alertCount');
+    if (data.count > 0) {
+      pill.style.display = 'flex';
+      countEl.textContent = data.count + ' Alert' + (data.count > 1 ? 's' : '');
+    }
+
+    const tbody = document.getElementById('alertTableBody');
+    const table = document.getElementById('alertTable');
+    const empty = document.getElementById('alertsEmpty');
+
+    if (!data.alerts.length) {
+      table.classList.add('hidden');
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    empty.classList.add('hidden');
+    table.classList.remove('hidden');
+    tbody.innerHTML = '';
+
+    data.alerts.forEach(a => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="mono" style="color:var(--text-dim)">${a.time}</td>
+        <td class="mono" style="color:var(--accent)">${a.ip}</td>
+        <td class="mono">${a.mac}</td>
+        <td>${a.message}</td>
+        <td><span class="badge badge-red">HIGH</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function clearAlerts() {
+    await fetch('/api/clear_alerts', { method: 'POST' });
+    loadAlerts();
+  }
+
+  async function checkAlerts() {
+    const res = await fetch('/api/alerts');
+    const data = await res.json();
+    if (data.count > 0) {
+      document.getElementById('alertPill').style.display = 'flex';
+      document.getElementById('alertCount').textContent = data.count + ' Alert(s)';
+    }
+  }
+</script>
+
+</body>
+</html>
