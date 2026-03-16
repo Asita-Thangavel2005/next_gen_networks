@@ -66,9 +66,3 @@ python app.py
 http://127.0.0.1:5000
 
 
-
-
-
-## 📄 License
-
-This project is built for academic purposes under the subject **5G & Next Generation Wireless Networks**.
